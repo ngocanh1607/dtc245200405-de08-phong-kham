@@ -1,0 +1,17 @@
+groups:
+  - name: clinic
+    rules:
+      - alert: TargetDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Target {{ $labels.job }} unreachable'
+      - alert: AppServerErrors
+        expr: sum(increase(clinic_http_requests_total{status=~"5.."}[5m])) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Application returned 5xx in the last 5 minutes'

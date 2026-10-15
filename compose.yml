@@ -134,6 +134,91 @@ services:
     depends_on:
       db:
         condition: service_healthy
+  postgres-exporter:
+    restart: unless-stopped
+    security_opt: *id001
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.17.1
+    environment:
+      DATA_SOURCE_URI: db:5432/clinic?sslmode=disable
+      DATA_SOURCE_USER: clinic_monitor
+      DATA_SOURCE_PASS: ${MONITOR_DB_PASSWORD}
+    networks:
+    - database
+    - monitoring
+    depends_on:
+      db:
+        condition: service_healthy
+    cap_drop:
+    - ALL
+  nginx-exporter:
+    restart: unless-stopped
+    security_opt: *id001
+    image: nginx/nginx-prometheus-exporter:1.5.1
+    command:
+    - --nginx.scrape-uri=http://nginx:8081/stub_status
+    networks:
+    - monitoring
+    depends_on:
+    - nginx
+    cap_drop:
+    - ALL
+  cadvisor:
+    restart: unless-stopped
+    security_opt: *id001
+    image: ghcr.io/google/cadvisor:0.60.5
+    privileged: true
+    devices:
+    - /dev/kmsg:/dev/kmsg
+    volumes:
+    - /:/rootfs:ro
+    - /var/run:/var/run:ro
+    - /sys:/sys:ro
+    - /var/lib/docker:/var/lib/docker:ro
+    - /dev/disk:/dev/disk:ro
+    networks:
+    - monitoring
+  prometheus:
+    restart: unless-stopped
+    security_opt: *id001
+    image: prom/prometheus:v3.4.1
+    user: 65534:65534
+    ports:
+    - 127.0.0.1:9090:9090
+    command:
+    - --config.file=/etc/prometheus/prometheus.yml
+    - --storage.tsdb.path=/prometheus
+    - --storage.tsdb.retention.time=7d
+    volumes:
+    - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+    - prometheus:/prometheus
+    networks:
+    - monitoring
+    cap_drop:
+    - ALL
+  grafana:
+    restart: unless-stopped
+    security_opt: *id001
+    image: grafana/grafana:12.0.2
+    user: 472:472
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?required}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+    ports:
+    - 127.0.0.1:3000:3000
+    volumes:
+    - grafana:/var/lib/grafana
+    - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+    - monitoring
+    - admin
+    depends_on:
+    - prometheus
+    cap_drop:
+    - ALL
 networks:
   frontend: {}
   database:
