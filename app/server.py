@@ -35,6 +35,12 @@ logger.addHandler(logging.StreamHandler())
 requests = Counter('clinic_http_requests_total', 'HTTP requests', ['method', 'endpoint', 'status'])
 latency = Histogram('clinic_http_request_seconds', 'Request latency', ['endpoint'])
 
+@app.template_filter('clinic_datetime')
+def clinic_datetime(value):
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value)
+    return value.strftime('%d/%m/%Y · %H:%M')
+
 def event(level, name, **values):
     logger.log(getattr(logging, level), json.dumps(dict(level=level, event=name, **values)))
 
